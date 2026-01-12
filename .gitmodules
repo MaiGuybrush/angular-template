@@ -1,0 +1,3 @@
+[submodule "project-docs"]
+	path = project-docs
+	url = http://tncimweb1.cminl.oa/git-server/guy.mai/universal-model-studio-project.git
