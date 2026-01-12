@@ -1,0 +1,13 @@
+{
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "model": {
+    "name": "auto-gemini-3"
+  },
+  "experimental": {
+    "skills": true
+  }
+}
