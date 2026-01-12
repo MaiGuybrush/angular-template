@@ -1,0 +1,555 @@
+openapi: 3.0.3
+info:
+  title: UMS Platform - Deployments API
+  description: |
+    部署管理 API，提供模型部署、部署版本、流量管理、回滾與監控功能。
+    
+    **功能涵蓋**：
+    - 部署 CRUD 操作
+    - 部署版本管理
+    - 流量權重調整（A/B 測試）
+    - 部署回滾
+    - 推論指標查詢
+  version: 1.0.0
+
+servers:
+  - url: https://api.ums.example.com/api/v1
+
+tags:
+  - name: Deployments
+  - name: Deployment Versions
+  - name: Monitoring
+
+paths:
+  /projects/{projectId}/deployments:
+    get:
+      tags: [Deployments]
+      summary: 查詢專案的部署清單
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: environment
+          in: query
+          schema:
+            type: string
+            enum: [Development, Staging, Production]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Running, Stopped, Deploying, Failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DeploymentListItemDto'
+                      page:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      totalCount:
+                        type: integer
+                      totalPages:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    post:
+      tags: [Deployments]
+      summary: 建立新部署
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeploymentRequest'
+      responses:
+        '201':
+          description: 部署建立成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DeploymentDetailDto'
+
+  /deployments/{deploymentId}:
+    get:
+      tags: [Deployments]
+      summary: 查詢部署詳細資訊
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DeploymentDetailDto'
+    
+    put:
+      tags: [Deployments]
+      summary: 更新部署
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeploymentRequest'
+      responses:
+        '200':
+          description: 更新成功
+    
+    delete:
+      tags: [Deployments]
+      summary: 刪除部署
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 刪除成功
+
+  /deployments/{deploymentId}/versions:
+    get:
+      tags: [Deployment Versions]
+      summary: 查詢部署版本清單
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeploymentVersionDto'
+    
+    post:
+      tags: [Deployment Versions]
+      summary: 新增部署版本
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddDeploymentVersionRequest'
+      responses:
+        '201':
+          description: 版本建立成功
+
+  /deployments/{deploymentId}/traffic:
+    patch:
+      tags: [Deployment Versions]
+      summary: 調整流量權重（A/B 測試）
+      description: 調整多個版本之間的流量分配，總權重必須為 100
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustTrafficWeightRequest'
+      responses:
+        '200':
+          description: 流量權重調整成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DeploymentDetailDto'
+
+  /deployment-versions/{versionId}/rollback:
+    post:
+      tags: [Deployment Versions]
+      summary: 回滾部署版本
+      description: 從目標版本建立新的部署版本並設定流量權重為 100%
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 回滾成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DeploymentVersionDto'
+
+  /deployment-versions/{versionId}/metrics:
+    get:
+      tags: [Monitoring]
+      summary: 查詢推論指標
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/InferenceMetricsDto'
+
+  /deployments/{deploymentId}/health:
+    get:
+      tags: [Monitoring]
+      summary: 查詢部署健康狀態
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deploymentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/DeploymentHealthDto'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  schemas:
+    DeploymentListItemDto:
+      type: object
+      properties:
+        deploymentId:
+          type: integer
+        deploymentName:
+          type: string
+        environment:
+          type: string
+          enum: [Development, Staging, Production]
+        status:
+          type: string
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        currentVersionCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    DeploymentDetailDto:
+      type: object
+      properties:
+        deploymentId:
+          type: integer
+        deploymentName:
+          type: string
+        environment:
+          type: string
+        status:
+          type: string
+        projectId:
+          type: integer
+        configuration:
+          type: object
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeploymentVersionDto'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateDeploymentRequest:
+      type: object
+      required:
+        - deploymentName
+        - environment
+      properties:
+        deploymentName:
+          type: string
+          maxLength: 100
+        environment:
+          type: string
+          enum: [Development, Staging, Production]
+        configuration:
+          type: object
+          properties:
+            replicas:
+              type: integer
+              example: 3
+            cpuLimit:
+              type: string
+              example: 2000m
+            memoryLimit:
+              type: string
+              example: 4Gi
+
+    UpdateDeploymentRequest:
+      type: object
+      properties:
+        deploymentName:
+          type: string
+        configuration:
+          type: object
+
+    DeploymentVersionDto:
+      type: object
+      properties:
+        versionId:
+          type: integer
+        deploymentId:
+          type: integer
+        modelVersionId:
+          type: integer
+        trafficWeight:
+          type: integer
+          example: 100
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AddDeploymentVersionRequest:
+      type: object
+      required:
+        - modelVersionId
+        - trafficWeight
+      properties:
+        modelVersionId:
+          type: integer
+        trafficWeight:
+          type: integer
+          minimum: 0
+          maximum: 100
+        autoScaling:
+          type: object
+          properties:
+            minReplicas:
+              type: integer
+            maxReplicas:
+              type: integer
+            targetCpuUtilization:
+              type: integer
+
+    AdjustTrafficWeightRequest:
+      type: object
+      required:
+        - versionWeights
+      properties:
+        versionWeights:
+          type: array
+          items:
+            type: object
+            properties:
+              versionId:
+                type: integer
+              weight:
+                type: integer
+                minimum: 0
+                maximum: 100
+
+    InferenceMetricsDto:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        requestCount:
+          type: integer
+        avgLatency:
+          type: number
+          format: float
+        errorRate:
+          type: number
+          format: float
+        cpuUsage:
+          type: number
+        memoryUsage:
+          type: number
+
+    DeploymentHealthDto:
+      type: object
+      properties:
+        deploymentId:
+          type: integer
+        overallStatus:
+          type: string
+          enum: [Healthy, Degraded, Unhealthy]
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              versionId:
+                type: integer
+              status:
+                type: string
+              replicas:
+                type: object
+                properties:
+                  ready:
+                    type: integer
+                  total:
+                    type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+  responses:
+    UnauthorizedError:
+      description: 未授權
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

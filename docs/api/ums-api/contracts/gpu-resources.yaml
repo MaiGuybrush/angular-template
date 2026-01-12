@@ -1,0 +1,521 @@
+openapi: 3.0.3
+info:
+  title: UMS Platform - GPU Resources API
+  description: |
+    GPU 資源管理 API，提供 GPU 節點查詢、資源使用統計與訓練任務佇列狀態查詢功能。
+    
+    **功能涵蓋**：
+    - GPU 節點清單查詢（狀態、規格）
+    - 專案資源使用統計查詢
+    - 訓練任務佇列狀態查詢
+    - 資源配額管理
+  version: 1.0.0
+
+servers:
+  - url: https://api.ums.example.com/api/v1
+
+tags:
+  - name: GPU Nodes
+  - name: Resource Usage
+  - name: Resource Quotas
+
+paths:
+  /gpu-nodes:
+    get:
+      tags: [GPU Nodes]
+      summary: 查詢 GPU 節點清單
+      description: 查詢平台所有 GPU 節點的狀態、規格與使用情況
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Online, Offline, Maintenance]
+          description: 過濾節點狀態
+        - name: gpuModel
+          in: query
+          schema:
+            type: string
+          description: 過濾 GPU 型號（例如：A100、V100）
+        - name: available
+          in: query
+          schema:
+            type: boolean
+          description: 僅顯示可用節點（有空閒 GPU）
+      responses:
+        '200':
+          description: 成功取得 GPU 節點清單
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GpuNodeDto'
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /gpu-nodes/{nodeId}:
+    get:
+      tags: [GPU Nodes]
+      summary: 查詢 GPU 節點詳細資訊
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功取得節點詳細資訊
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/GpuNodeDetailDto'
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/resource-usage:
+    get:
+      tags: [Resource Usage]
+      summary: 查詢專案資源使用統計
+      description: |
+        查詢專案在指定時間範圍內的 GPU 資源使用統計，包含：
+        - 總 GPU 小時數
+        - 平均 GPU 使用率
+        - 訓練任務統計
+        - 配額使用情況
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: 查詢起始時間
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: 查詢結束時間
+      responses:
+        '200':
+          description: 成功取得資源使用統計
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ResourceUsageSummaryDto'
+                  message:
+                    type: string
+        '400':
+          description: 請求參數錯誤
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /projects/{projectId}/resource-quota:
+    get:
+      tags: [Resource Quotas]
+      summary: 查詢專案資源配額
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 成功取得資源配額
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ResourceQuotaDto'
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    put:
+      tags: [Resource Quotas]
+      summary: 更新專案資源配額
+      description: 更新專案的 GPU 資源配額（需要管理員權限）
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResourceQuotaRequest'
+      responses:
+        '200':
+          description: 配額更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ResourceQuotaDto'
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  schemas:
+    GpuNodeDto:
+      type: object
+      properties:
+        nodeId:
+          type: integer
+          example: 10
+        nodeName:
+          type: string
+          example: gpu-node-01
+        status:
+          type: string
+          enum: [Online, Offline, Maintenance]
+          example: Online
+        gpuModel:
+          type: string
+          example: NVIDIA A100
+        totalGpus:
+          type: integer
+          example: 8
+        availableGpus:
+          type: integer
+          example: 3
+        cpuCores:
+          type: integer
+          example: 64
+        memoryGB:
+          type: integer
+          example: 512
+        diskGB:
+          type: integer
+          example: 2000
+        lastHeartbeat:
+          type: string
+          format: date-time
+          example: '2026-01-09T10:00:00Z'
+
+    GpuNodeDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/GpuNodeDto'
+        - type: object
+          properties:
+            ipAddress:
+              type: string
+              example: 192.168.1.100
+            location:
+              type: string
+              example: 台北機房 Rack-A3
+            currentJobs:
+              type: array
+              items:
+                type: object
+                properties:
+                  jobId:
+                    type: integer
+                  modelName:
+                    type: string
+                  gpusAllocated:
+                    type: integer
+                  startedAt:
+                    type: string
+                    format: date-time
+            resourceUsage:
+              type: object
+              properties:
+                cpuUtilization:
+                  type: number
+                  format: float
+                  example: 65.5
+                  description: CPU 使用率（%）
+                memoryUtilization:
+                  type: number
+                  format: float
+                  example: 78.2
+                  description: 記憶體使用率（%）
+                avgGpuUtilization:
+                  type: number
+                  format: float
+                  example: 92.3
+                  description: 平均 GPU 使用率（%）
+
+    ResourceUsageSummaryDto:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        period:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+        gpuHours:
+          type: object
+          properties:
+            total:
+              type: number
+              format: float
+              example: 850.5
+              description: 總 GPU 小時數
+            quota:
+              type: number
+              format: float
+              example: 1000
+              description: 配額 GPU 小時數
+            remaining:
+              type: number
+              format: float
+              example: 149.5
+              description: 剩餘 GPU 小時數
+            utilizationRate:
+              type: number
+              format: float
+              example: 85.05
+              description: 配額使用率（%）
+        trainingJobs:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 45
+            completed:
+              type: integer
+              example: 38
+            failed:
+              type: integer
+              example: 5
+            cancelled:
+              type: integer
+              example: 2
+        costEstimate:
+          type: object
+          properties:
+            amount:
+              type: number
+              format: float
+              example: 12750.75
+            currency:
+              type: string
+              example: TWD
+            description:
+              type: string
+              example: 以每 GPU 小時 15 TWD 計算
+
+    ResourceQuotaDto:
+      type: object
+      properties:
+        quotaId:
+          type: integer
+        projectId:
+          type: integer
+        monthlyGpuHours:
+          type: number
+          format: float
+          example: 1000
+          description: 每月 GPU 小時配額
+        maxConcurrentJobs:
+          type: integer
+          example: 5
+          description: 最大並行訓練任務數
+        maxGpuPerJob:
+          type: integer
+          example: 4
+          description: 單一任務最大 GPU 數
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 5
+          description: 專案優先級（1-10）
+        validFrom:
+          type: string
+          format: date-time
+        validUntil:
+          type: string
+          format: date-time
+        currentUsage:
+          type: object
+          properties:
+            gpuHoursUsed:
+              type: number
+              format: float
+              example: 850.5
+            activeJobs:
+              type: integer
+              example: 2
+
+    UpdateResourceQuotaRequest:
+      type: object
+      properties:
+        monthlyGpuHours:
+          type: number
+          format: float
+          minimum: 0
+          example: 1000
+        maxConcurrentJobs:
+          type: integer
+          minimum: 1
+          maximum: 20
+          example: 5
+        maxGpuPerJob:
+          type: integer
+          minimum: 1
+          maximum: 8
+          example: 4
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 5
+        validUntil:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+  responses:
+    BadRequestError:
+      description: 請求參數錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    UnauthorizedError:
+      description: 未授權
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    ForbiddenError:
+      description: 權限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    NotFoundError:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    
+    InternalServerError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

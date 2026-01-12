@@ -1,0 +1,1185 @@
+openapi: 3.0.3
+info:
+  title: UMS Platform - Datasets API
+  description: |
+    資料集管理 API，提供資料集、資料集版本、影像與標註的完整生命週期管理功能。
+    
+    **功能涵蓋**：
+    - 資料集 CRUD 操作
+    - 資料集版本管理（版本建立、查詢、統計）
+    - 影像批次上傳與管理
+    - 標註資料 CRUD 操作
+    
+    **權限控制**：
+    - 需要專案成員權限才能存取資料集
+    - Editor 角色以上可修改資料集與標註
+    - Owner 可刪除資料集
+  version: 1.0.0
+  contact:
+    name: UMS API Support
+    email: api-support@ums.example.com
+
+servers:
+  - url: https://api.ums.example.com/api/v1
+    description: 正式環境
+  - url: https://staging-api.ums.example.com/api/v1
+    description: 測試環境
+
+tags:
+  - name: Datasets
+    description: 資料集管理
+  - name: Dataset Versions
+    description: 資料集版本管理
+  - name: Images
+    description: 影像管理
+  - name: Annotations
+    description: 標註管理
+
+paths:
+  /projects/{projectId}/datasets:
+    get:
+      tags: [Datasets]
+      summary: 查詢專案的資料集清單
+      operationId: getDatasets
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: 專案 ID
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: 頁碼
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: 每頁筆數
+        - name: dataType
+          in: query
+          schema:
+            type: string
+            enum: [SingleLabel, MultiLabel, ObjectDetection, Segmentation]
+          description: 過濾資料類型
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+          description: 搜尋資料集名稱或描述
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            default: CreatedAt
+            enum: [CreatedAt, UpdatedAt, DatasetName, ImageCount]
+          description: 排序欄位
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            default: desc
+            enum: [asc, desc]
+          description: 排序方向
+      responses:
+        '200':
+          description: 成功取得資料集清單
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DatasetListItemDto'
+                      page:
+                        type: integer
+                        example: 1
+                      pageSize:
+                        type: integer
+                        example: 20
+                      totalCount:
+                        type: integer
+                        example: 45
+                      totalPages:
+                        type: integer
+                        example: 3
+                  message:
+                    type: string
+                    example: 資料集清單查詢成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: 專案不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: PROJECT_NOT_FOUND
+                  message: 指定的專案不存在
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags: [Datasets]
+      summary: 建立新資料集
+      operationId: createDataset
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDatasetRequest'
+      responses:
+        '201':
+          description: 資料集建立成功
+          headers:
+            Location:
+              schema:
+                type: string
+              description: 新建立資料集的 URI
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/DatasetDetailDto'
+                  message:
+                    type: string
+                    example: 資料集建立成功
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: 專案不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: 資料集名稱已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: DATASET_NAME_CONFLICT
+                  message: 此專案中已存在相同名稱的資料集
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /datasets/{datasetId}:
+    get:
+      tags: [Datasets]
+      summary: 查詢資料集詳細資訊
+      operationId: getDatasetById
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 成功取得資料集詳細資訊
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/DatasetDetailDto'
+                  message:
+                    type: string
+                    example: 資料集詳細資訊查詢成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          description: 資料集不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    put:
+      tags: [Datasets]
+      summary: 更新資料集
+      operationId: updateDataset
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDatasetRequest'
+      responses:
+        '200':
+          description: 資料集更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/DatasetDetailDto'
+                  message:
+                    type: string
+                    example: 資料集更新成功
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags: [Datasets]
+      summary: 刪除資料集（軟刪除）
+      operationId: deleteDataset
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '204':
+          description: 資料集刪除成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: 資料集正在使用中，無法刪除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: DATASET_IN_USE
+                  message: 資料集正被訓練任務使用，無法刪除
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /datasets/{datasetId}/versions:
+    get:
+      tags: [Dataset Versions]
+      summary: 查詢資料集版本清單
+      operationId: getDatasetVersions
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 成功取得版本清單
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DatasetVersionDto'
+                  message:
+                    type: string
+                    example: 資料集版本清單查詢成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags: [Dataset Versions]
+      summary: 建立資料集新版本
+      operationId: createDatasetVersion
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: datasetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDatasetVersionRequest'
+      responses:
+        '201':
+          description: 版本建立成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/DatasetVersionDetailDto'
+                  message:
+                    type: string
+                    example: 資料集版本建立成功
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dataset-versions/{versionId}/images:
+    get:
+      tags: [Images]
+      summary: 查詢資料集版本的影像清單
+      operationId: getImages
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: annotated
+          in: query
+          schema:
+            type: boolean
+          description: 過濾已標註/未標註影像
+      responses:
+        '200':
+          description: 成功取得影像清單
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ImageDto'
+                      page:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      totalCount:
+                        type: integer
+                      totalPages:
+                        type: integer
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dataset-versions/{versionId}/images/batch:
+    post:
+      tags: [Images]
+      summary: 批次上傳影像
+      description: |
+        支援多檔案上傳，接受 multipart/form-data 格式。
+        上傳後系統會建立批次處理任務，非同步處理影像。
+      operationId: batchUploadImages
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: 影像檔案（支援 JPG、PNG、BMP）
+      responses:
+        '202':
+          description: 批次上傳任務已接受
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/BatchUploadJobDto'
+                  message:
+                    type: string
+                    example: 批次上傳任務已建立，請稍後查詢處理狀態
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '413':
+          description: 上傳檔案過大
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: PAYLOAD_TOO_LARGE
+                  message: 上傳檔案總大小超過限制（單次最大 500MB）
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /images/{imageId}/annotations:
+    get:
+      tags: [Annotations]
+      summary: 查詢影像的標註資料
+      operationId: getAnnotations
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: 成功取得標註資料
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnnotationDto'
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    post:
+      tags: [Annotations]
+      summary: 新增標註資料
+      operationId: createAnnotation
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnnotationRequest'
+      responses:
+        '201':
+          description: 標註建立成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AnnotationDto'
+                  message:
+                    type: string
+                    example: 標註建立成功
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /annotations/{annotationId}:
+    put:
+      tags: [Annotations]
+      summary: 更新標註資料
+      operationId: updateAnnotation
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: annotationId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAnnotationRequest'
+      responses:
+        '200':
+          description: 標註更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/AnnotationDto'
+                  message:
+                    type: string
+                    example: 標註更新成功
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    
+    delete:
+      tags: [Annotations]
+      summary: 刪除標註資料
+      operationId: deleteAnnotation
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: annotationId
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '204':
+          description: 標註刪除成功
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token 認證（從 /auth/login 取得）
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API Key 認證（從 /api-keys 取得）
+
+  schemas:
+    DatasetListItemDto:
+      type: object
+      properties:
+        datasetId:
+          type: integer
+          example: 10
+        datasetName:
+          type: string
+          example: Cat-Dog Dataset
+        description:
+          type: string
+          example: 貓狗二元分類資料集
+        dataType:
+          type: string
+          enum: [SingleLabel, MultiLabel, ObjectDetection, Segmentation]
+          example: SingleLabel
+        projectId:
+          type: integer
+          example: 5
+        projectName:
+          type: string
+          example: Computer Vision Project
+        currentVersionNumber:
+          type: integer
+          example: 3
+        totalImages:
+          type: integer
+          example: 5000
+        createdBy:
+          type: integer
+          example: 1
+        creatorName:
+          type: string
+          example: 張三
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-01-01T10:00:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2026-01-08T15:30:00Z'
+
+    DatasetDetailDto:
+      type: object
+      properties:
+        datasetId:
+          type: integer
+        datasetName:
+          type: string
+        description:
+          type: string
+        dataType:
+          type: string
+          enum: [SingleLabel, MultiLabel, ObjectDetection, Segmentation]
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        createdBy:
+          type: integer
+        creatorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [Active, Archived]
+        currentVersion:
+          $ref: '#/components/schemas/DatasetVersionDto'
+        versionCount:
+          type: integer
+          example: 5
+        totalImages:
+          type: integer
+          example: 5000
+        statistics:
+          type: object
+          properties:
+            annotatedImages:
+              type: integer
+              example: 4500
+            unannotatedImages:
+              type: integer
+              example: 500
+            totalLabels:
+              type: integer
+              example: 4500
+            labelDistribution:
+              type: object
+              additionalProperties:
+                type: integer
+              example:
+                cat: 2300
+                dog: 2200
+
+    CreateDatasetRequest:
+      type: object
+      required:
+        - datasetName
+        - dataType
+      properties:
+        datasetName:
+          type: string
+          maxLength: 100
+          example: Cat-Dog Dataset
+        description:
+          type: string
+          maxLength: 500
+          example: 貓狗二元分類資料集，用於影像辨識訓練
+        dataType:
+          type: string
+          enum: [SingleLabel, MultiLabel, ObjectDetection, Segmentation]
+          example: SingleLabel
+
+    UpdateDatasetRequest:
+      type: object
+      required:
+        - datasetName
+      properties:
+        datasetName:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+
+    DatasetVersionDto:
+      type: object
+      properties:
+        versionId:
+          type: integer
+          example: 25
+        datasetId:
+          type: integer
+          example: 10
+        versionNumber:
+          type: integer
+          example: 3
+        changeLog:
+          type: string
+          example: 新增 500 張影像，平衡類別分布
+        versionNote:
+          type: string
+          example: v1.3 - 生產環境版本
+        imageCount:
+          type: integer
+          example: 5000
+        createdBy:
+          type: integer
+        creatorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    DatasetVersionDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/DatasetVersionDto'
+        - type: object
+          properties:
+            statistics:
+              type: object
+              properties:
+                annotatedCount:
+                  type: integer
+                  example: 4500
+                unannotatedCount:
+                  type: integer
+                  example: 500
+                labelDistribution:
+                  type: object
+                  additionalProperties:
+                    type: integer
+
+    CreateDatasetVersionRequest:
+      type: object
+      required:
+        - changeLog
+      properties:
+        changeLog:
+          type: string
+          maxLength: 500
+          example: 新增 500 張高品質影像
+        versionNote:
+          type: string
+          maxLength: 200
+          example: v1.2 - 測試版本
+
+    ImageDto:
+      type: object
+      properties:
+        imageId:
+          type: integer
+          example: 1001
+        fileName:
+          type: string
+          example: cat_001.jpg
+        fileSize:
+          type: integer
+          example: 245760
+          description: 檔案大小（bytes）
+        width:
+          type: integer
+          example: 1920
+        height:
+          type: integer
+          example: 1080
+        storageUrl:
+          type: string
+          example: https://storage.ums.example.com/datasets/10/images/cat_001.jpg
+        thumbnailUrl:
+          type: string
+          example: https://storage.ums.example.com/datasets/10/thumbnails/cat_001_thumb.jpg
+        uploadedBy:
+          type: integer
+        uploaderName:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+        annotationCount:
+          type: integer
+          example: 1
+        isAnnotated:
+          type: boolean
+          example: true
+
+    BatchUploadJobDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        versionId:
+          type: integer
+          example: 25
+        totalFiles:
+          type: integer
+          example: 100
+        processedFiles:
+          type: integer
+          example: 0
+        status:
+          type: string
+          enum: [Pending, Processing, Completed, Failed]
+          example: Pending
+        statusUrl:
+          type: string
+          example: /api/v1/upload-jobs/550e8400-e29b-41d4-a716-446655440000
+
+    AnnotationDto:
+      type: object
+      properties:
+        annotationId:
+          type: integer
+          example: 5001
+        imageId:
+          type: integer
+          example: 1001
+        labelName:
+          type: string
+          example: cat
+        labelId:
+          type: integer
+          example: 1
+        annotationType:
+          type: string
+          enum: [BoundingBox, Polygon, Point, Segmentation]
+          example: BoundingBox
+        coordinates:
+          type: object
+          description: 座標資料（依 annotationType 而異）
+          example:
+            x: 100
+            y: 150
+            width: 300
+            height: 400
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.95
+        annotatedBy:
+          type: integer
+        annotatorName:
+          type: string
+        annotatedAt:
+          type: string
+          format: date-time
+
+    CreateAnnotationRequest:
+      type: object
+      required:
+        - labelName
+        - annotationType
+        - coordinates
+      properties:
+        labelName:
+          type: string
+          maxLength: 50
+          example: cat
+        annotationType:
+          type: string
+          enum: [BoundingBox, Polygon, Point, Segmentation]
+          example: BoundingBox
+        coordinates:
+          type: object
+          description: 座標資料（JSON object）
+          example:
+            x: 100
+            y: 150
+            width: 300
+            height: 400
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 1.0
+
+    UpdateAnnotationRequest:
+      type: object
+      properties:
+        labelName:
+          type: string
+          maxLength: 50
+        coordinates:
+          type: object
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: 請求資料驗證失敗
+            validationErrors:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  type: string
+              example:
+                datasetName:
+                  - 資料集名稱為必填欄位
+                  - 資料集名稱長度不得超過 100 字元
+
+  responses:
+    BadRequestError:
+      description: 請求參數錯誤或驗證失敗
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: 請求資料驗證失敗
+              validationErrors:
+                datasetName:
+                  - 資料集名稱為必填欄位
+    
+    UnauthorizedError:
+      description: 未提供有效的認證資訊
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: 請提供有效的 JWT Token 或 API Key
+    
+    ForbiddenError:
+      description: 權限不足，無法執行此操作
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: 您沒有權限存取此資源
+    
+    NotFoundError:
+      description: 請求的資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: 請求的資源不存在
+    
+    ConflictError:
+      description: 資源衝突（例如：名稱重複）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: CONFLICT
+              message: 資源名稱已存在，請使用其他名稱
+    
+    InternalServerError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: 伺服器發生錯誤，請稍後再試
