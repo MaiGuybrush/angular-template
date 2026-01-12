@@ -1,0 +1,8 @@
+{
+  "track_id": "app_shell_20260112",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-12T13:50:00Z",
+  "updated_at": "2026-01-12T13:50:00Z",
+  "description": "Build the core application shell and navigation infrastructure, including the dashboard layout and SSO redirection logic."
+}
