@@ -1,12 +1,12 @@
 # Plan: Application Shell & Navigation
 
-## Phase 1: Project Initialization & Configuration
+## Phase 1: Project Initialization & Configuration [checkpoint: 0604e76]
 - [x] Task: Initialize Angular Project & Tailwind CSS [commit: 83f03e7]
   - [x] Subtask: Run `ng new` to create the project structure.
   - [x] Subtask: Install and configure Tailwind CSS.
   - [x] Subtask: Configure ESLint and Prettier.
   - [x] Subtask: Verify build and test runners.
-- [ ] Task: Conductor - User Manual Verification 'Project Initialization & Configuration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Project Initialization & Configuration' (Protocol in workflow.md)
 
 ## Phase 2: Core Architecture & Authentication
 
@@ -19,7 +19,7 @@
   - [x] Subtask: Create `appInitializer` function/service (porting `AppInitService` logic).
   - [x] Subtask: Handle `CertificateKey` verification (Case 2) and `tryAuth` (Case 1) in initializer.
   - [x] Subtask: Configure `app.config.ts` with `APP_INITIALIZER` and `HTTP_INTERCEPTORS`.
-- [ ] Task: Conductor - User Manual Verification 'Core Architecture & Authentication' (Protocol in workflow.md)
+- [~] Task: Conductor - User Manual Verification 'Core Architecture & Authentication' (Protocol in workflow.md)
 
 ## Phase 3: Layout & Navigation Implementation
 - [ ] Task: Build Sidebar Navigation Component
