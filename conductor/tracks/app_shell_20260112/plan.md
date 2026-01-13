@@ -9,13 +9,16 @@
 - [ ] Task: Conductor - User Manual Verification 'Project Initialization & Configuration' (Protocol in workflow.md)
 
 ## Phase 2: Core Architecture & Authentication
-- [ ] Task: Implement Auth Service & Guard
-  - [ ] Subtask: Write unit tests for AuthService (check session, redirect logic).
-  - [ ] Subtask: Implement AuthService with mock SSO redirection logic (configurable URL).
-  - [ ] Subtask: Implement AuthGuard to protect routes.
-- [ ] Task: Set up Routing Module
-  - [ ] Subtask: Define root routes (login-callback, app).
-  - [ ] Subtask: Configure lazy loading for feature modules.
+
+- [x] Task: Implement Core Auth Infrastructure [commit: 39eec16]
+  - [x] Subtask: Define interfaces (EmpInfo, UserInfo) based on references.
+  - [x] Subtask: Implement `AuthService` (porting `UserService` logic using Signals).
+  - [x] Subtask: Implement `JwtInterceptor` with 401 refresh token logic.
+  - [x] Subtask: Implement `AuthGuard` (simple check, relies on AppInit).
+- [x] Task: Implement Application Initialization [commit: 39eec16]
+  - [x] Subtask: Create `appInitializer` function/service (porting `AppInitService` logic).
+  - [x] Subtask: Handle `CertificateKey` verification (Case 2) and `tryAuth` (Case 1) in initializer.
+  - [x] Subtask: Configure `app.config.ts` with `APP_INITIALIZER` and `HTTP_INTERCEPTORS`.
 - [ ] Task: Conductor - User Manual Verification 'Core Architecture & Authentication' (Protocol in workflow.md)
 
 ## Phase 3: Layout & Navigation Implementation
