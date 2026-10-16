@@ -41,3 +41,11 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+**/node_modules/
+graphify-out/
+/playwright-report/
+/docs/user-manual/book/
+/test-results/
+__pycache__/
+*.pyc
+.temp-execution-*

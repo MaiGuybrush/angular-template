@@ -1,59 +1,44 @@
-# UmsFrontend
+# TemplateApp (Angular Enterprise Template 2026)
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.5.
+本專案為企業級 Angular 21 標準範本，整合 Tailwind CSS、企業 SSO 認證（`@inx/inx-auth-lib`）、ESLint 與 Vitest 單元測試框架。
 
-## Development server
+---
 
-To start a local development server, run:
+## 快速建立新專案 (Scaffolding)
 
-```bash
-ng serve
+本專案提供 PowerShell 腳手架腳本 `scaffold.ps1`，讓開發者能直接透過參數 `<appName>` 從 Gitea 克隆本範本，並自動將專案更名為新開發專案：
+
+```powershell
+# 基本用法：指定新專案名稱（將自動從 Gitea clone 至 ./my-new-app 並完成初始化）
+.\scaffold.ps1 -AppName "my-new-app"
+
+# 進階用法：自訂目標目錄、略過 npm install
+.\scaffold.ps1 -AppName "my-new-app" -TargetDir "D:\Projects\my-new-app" -SkipInstall
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+---
 
-## Code scaffolding
+## 開發指南 (Development)
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
+### 啟動本地開發伺服器
 ```bash
-ng generate component component-name
+npm start
+# 或 ng serve
+```
+預設將啟動於 `http://localhost:4200/`。
+
+### 建置專案
+```bash
+npm run build
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
+### 執行單元測試
 ```bash
-ng generate --help
+npm test
 ```
 
-## Building
-
-To build the project run:
-
+### 程式碼檢查與排版
 ```bash
-ng build
+npm run lint
+npm run format
 ```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

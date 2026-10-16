@@ -10,7 +10,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "ums-frontend": {
+    "template-app": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -60,10 +60,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "ums-frontend:build:production"
+              "buildTarget": "template-app:build:production"
             },
             "development": {
-              "buildTarget": "ums-frontend:build:development"
+              "buildTarget": "template-app:build:development"
             }
           },
           "defaultConfiguration": "development"
