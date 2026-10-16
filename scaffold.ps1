@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Angular 專案範本腳手架生成腳本 (angular-template-2026)
 
@@ -144,6 +144,17 @@ Replace-FileString (Join-Path $WorkDir "README.md") @{
 
 Replace-FileString (Join-Path $WorkDir "conductor\product.md") @{
     "template-app" = $KebabName
+}
+
+if (-not $InPlace) {
+    $scriptFilesToClean = @("scaffold.ps1", "scarfold.ps1")
+    foreach ($f in $scriptFilesToClean) {
+        $targetFile = Join-Path $WorkDir $f
+        if (Test-Path $targetFile) {
+            Remove-Item -Force $targetFile
+            Write-Host "           [清理] 已移除新專案目錄下的 $f" -ForegroundColor Gray
+        }
+    }
 }
 
 Write-Host "[步驟 4/5] 正在初始化全新 Git 倉儲..." -ForegroundColor Cyan
