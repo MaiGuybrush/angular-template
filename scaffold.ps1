@@ -11,7 +11,7 @@
 param(
     [Parameter(Mandatory = $true, Position = 0, HelpMessage = "請輸入新專案名稱 (例: my-new-app)")]
     [ValidateNotNullOrEmpty()]
-    [ValidatePattern('^[a-zA-Z0-9\-_]+$', ErrorMessage = "專案名稱僅允許英文字母、數字、連字號(-)與底線(_)")]
+    [ValidatePattern('^[a-zA-Z0-9\-_]+$')]
     [string]$AppName,
 
     [Parameter(Mandatory = $false, Position = 1)]
@@ -33,14 +33,15 @@ param(
 $ErrorActionPreference = "Stop"
 
 function ConvertTo-KebabCase([string]$text) {
-    $kebab = $text -replace '([a-z0-9])([A-Z])', '$1-$2'
+    $kebab = $text -creplace '([a-z0-9])([A-Z])', '$1-$2'
     $kebab = $kebab -replace '[_\s]+', '-'
     $kebab = $kebab.ToLower().Trim('-')
     return $kebab
 }
 
 function ConvertTo-PascalCase([string]$text) {
-    $parts = $text -split '[-_\s]+'
+    $normalized = $text -creplace '([a-z0-9])([A-Z])', '$1-$2'
+    $parts = $normalized -split '[-_\s]+'
     $pascal = ($parts | ForEach-Object {
         if ($_.Length -gt 0) {
             $_.Substring(0, 1).ToUpper() + $_.Substring(1).ToLower()
