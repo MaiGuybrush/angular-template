@@ -12,7 +12,7 @@
 # 基本用法：指定新專案名稱（將自動從 Gitea clone 至 ./my-new-app 並完成初始化）
 .\scaffold.ps1 -AppName "my-new-app"
 
-# 進階用法：自訂目標目錄、略過 npm install
+# 進階用法：自訂目標目錄、略過 pnpm install
 .\scaffold.ps1 -AppName "my-new-app" -TargetDir "D:\Projects\my-new-app" -SkipInstall
 ```
 
@@ -21,24 +21,29 @@
 ## 開發指南 (Development)
 
 ### 啟動本地開發伺服器
+
 ```bash
-npm start
+pnpm start
 # 或 ng serve
 ```
+
 預設將啟動於 `http://localhost:4200/`。
 
 ### 建置專案
+
 ```bash
-npm run build
+pnpm build
 ```
 
 ### 執行單元測試
+
 ```bash
-npm test
+pnpm test
 ```
 
 ### 程式碼檢查與排版
+
 ```bash
-npm run lint
-npm run format
+pnpm lint
+pnpm format
 ```

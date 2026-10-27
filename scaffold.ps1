@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Angular 專案範本腳手架生成腳本 (angular-template-2026)
 
@@ -115,10 +115,6 @@ Replace-FileString (Join-Path $WorkDir "package.json") @{
     '"name": "template-app"' = ('"name": "' + $KebabName + '"')
 }
 
-Replace-FileString (Join-Path $WorkDir "package-lock.json") @{
-    '"name": "template-app"' = ('"name": "' + $KebabName + '"')
-}
-
 Replace-FileString (Join-Path $WorkDir "angular.json") @{
     '"template-app": {' = ('"' + $KebabName + '": {')
     'template-app:build:' = ($KebabName + ':build:')
@@ -185,24 +181,24 @@ try {
 }
 
 if (-not $SkipInstall) {
-    if (Get-Command npm -ErrorAction SilentlyContinue) {
-        Write-Host "[步驟 5/5] 正在執行 npm install (可使用 -SkipInstall 跳過)..." -ForegroundColor Cyan
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+        Write-Host "[步驟 5/5] 正在執行 pnpm install (可使用 -SkipInstall 跳過)..." -ForegroundColor Cyan
         Push-Location $WorkDir
         try {
-            & npm install
+            & pnpm install
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "           [完成] 依賴套件安裝成功！" -ForegroundColor Green
             } else {
-                Write-Warning "npm install 回傳非零狀態碼，您可稍後手動執行 npm install。"
+                Write-Warning "pnpm install 回傳非零狀態碼，您可稍後手動執行 pnpm install。"
             }
         } finally {
             Pop-Location
         }
     } else {
-        Write-Warning "找不到 npm 指令，已略過自動安裝依賴。"
+        Write-Warning "找不到 pnpm 指令，請先安裝 pnpm (npm install -g pnpm)，已略過自動安裝依賴。"
     }
 } else {
-    Write-Host "[步驟 5/5] 已指定 -SkipInstall，略過 npm install。" -ForegroundColor Gray
+    Write-Host "[步驟 5/5] 已指定 -SkipInstall，略過 pnpm install。" -ForegroundColor Gray
 }
 
 Write-Host "`n========================================================" -ForegroundColor Green
@@ -212,10 +208,10 @@ Write-Host "========================================================" -Foregroun
 Write-Host "下一步操作指引：" -ForegroundColor Yellow
 Write-Host "  1. 進入專案目錄:  cd `"$WorkDir`"" -ForegroundColor White
 if ($SkipInstall) {
-    Write-Host "  2. 安裝相依套件:  npm install" -ForegroundColor White
-    Write-Host "  3. 啟動開發伺服器: npm start" -ForegroundColor White
+    Write-Host "  2. 安裝相依套件:  pnpm install" -ForegroundColor White
+    Write-Host "  3. 啟動開發伺服器: pnpm start" -ForegroundColor White
 } else {
-    Write-Host "  2. 啟動開發伺服器: npm start" -ForegroundColor White
+    Write-Host "  2. 啟動開發伺服器: pnpm start" -ForegroundColor White
 }
 Write-Host "  4. 設定新遠端倉儲: git remote add origin [您的新專案-Git-URL]" -ForegroundColor White
 Write-Host "  5. 推送至遠端:     git push -u origin $Branch" -ForegroundColor White
