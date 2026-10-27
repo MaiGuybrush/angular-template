@@ -1,22 +1,27 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient, HTTP_INTERCEPTORS, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { JwtInterceptor } from './jwt.interceptor';
 import { AuthService } from './auth.service';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { vi } from 'vitest';
+import { EmpInfo, SsoUrls } from './auth.models';
 
 describe('JwtInterceptor', () => {
   let httpMock: HttpTestingController;
   let httpClient: HttpClient;
-  let authService: any;
+  let authService: {
+    token: string;
+    refreshToken: ReturnType<typeof vi.fn>;
+    logOutObs: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     authService = {
       token: 'test-token',
       refreshToken: vi.fn(),
-      logOutObs: vi.fn()
+      logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls))
     };
 
     TestBed.configureTestingModule({
@@ -36,7 +41,7 @@ describe('JwtInterceptor', () => {
     httpMock.verify();
   });
 
-  it('should add Authorization header', () => {
+  it('should add Authorization header to normal API requests', () => {
     httpClient.get('/api/data').subscribe();
     
     const req = httpMock.expectOne('/api/data');
@@ -54,8 +59,20 @@ describe('JwtInterceptor', () => {
     req.flush({});
   });
 
+  it('should skip Authorization header for assets/config.json and auth endpoints', () => {
+    httpClient.get('assets/config.json').subscribe();
+    const configReq = httpMock.expectOne('assets/config.json');
+    expect(configReq.request.headers.has('Authorization')).toBe(false);
+    configReq.flush({});
+
+    httpClient.post('/uacapi/adAuth/RefreshToken', {}).subscribe();
+    const refreshReq = httpMock.expectOne('/uacapi/adAuth/RefreshToken');
+    expect(refreshReq.request.headers.has('Authorization')).toBe(false);
+    refreshReq.flush({});
+  });
+
   it('should attempt refresh on 401', () => {
-    authService.refreshToken.mockReturnValue(of({ token: 'new-token' }));
+    authService.refreshToken.mockReturnValue(of({ token: 'new-token' } as EmpInfo));
     
     httpClient.get('/api/data').subscribe(res => {
       expect(res).toBeTruthy();
@@ -64,15 +81,8 @@ describe('JwtInterceptor', () => {
     const req = httpMock.expectOne('/api/data');
     req.flush('401 error', { status: 401, statusText: 'Unauthorized' });
 
-    // Should have triggered refresh
     expect(authService.refreshToken).toHaveBeenCalled();
     
-    // Should retry request with new token
-    // Note: HttpTestingController might handle retries in a specific way.
-    // In many interceptor tests, we check if the retry request happens.
-    // However, since we mock refreshToken, the interceptor should re-subscribe to the request.
-    
-    // We expect a second request to '/api/data'
     const retryReq = httpMock.expectOne('/api/data');
     expect(retryReq.request.headers.get('Authorization')).toBe('Bearer new-token');
     retryReq.flush({ data: 'success' });

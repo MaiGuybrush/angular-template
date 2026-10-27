@@ -1,7 +1,8 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap, map, catchError, of, delay } from 'rxjs';
+import { Observable, tap, catchError, of, delay } from 'rxjs';
 import { EmpInfo, SsoUrls } from './auth.models';
+import { ConfigService } from '../config/config.service';
 
 const TOKEN_KEY = "CIM_TK";
 const USER_KEY = "CIM_USER";
@@ -12,8 +13,12 @@ const REFRESH_KEY = "CIM_RTK";
 })
 export class AuthService {
   private http = inject(HttpClient);
-  // Base URL for Auth API
-  private authApiUrl = 'http://tncimweb1.cminl.oa/uacapi/adAuth';
+  private configService = inject(ConfigService);
+  
+  // Base URL for Auth API from runtime configuration
+  get authApiUrl(): string {
+    return this.configService.authApiUrl();
+  }
   
   // State
   private _currentUser = signal<EmpInfo | null>(null);
@@ -41,6 +46,28 @@ export class AuthService {
         this.clearLoginInfo();
       }
     }
+  }
+
+  async init(): Promise<EmpInfo | null> {
+    if (this.configService.isMockAuth()) {
+      const configUser = this.configService.mockUser();
+      const syntheticUser: EmpInfo = {
+        no: configUser?.no ?? '1',
+        id: configUser?.id ?? 'DEV001',
+        name: configUser?.name ?? 'Local Developer',
+        email: configUser?.email ?? 'dev@innolux.com',
+        department: configUser?.department ?? 'CIM',
+        orgShop: configUser?.orgShop ?? 'FAB1',
+        location: configUser?.location ?? 'Tainan',
+        shops: configUser?.shops ?? ['FAB1', 'FAB2'],
+        token: configUser?.token ?? 'mock-dev-token',
+        departmentCode: configUser?.departmentCode ?? 'CIM01',
+        refreshToken: configUser?.refreshToken ?? 'mock-dev-refresh-token'
+      };
+      this.saveUser(syntheticUser);
+      return syntheticUser;
+    }
+    return null;
   }
 
   saveUser(user: EmpInfo | null) {
@@ -84,24 +111,28 @@ export class AuthService {
     return this.http.get<SsoUrls>(`${this.authApiUrl}/SsoUrl`);
   }
 
-  logOutObs(): Observable<any> {
+  private resolveAbsoluteRedirectUrl(url: string): string {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const origin = window.location.origin;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${origin}${path}`;
+  }
+
+  logOutObs(): Observable<SsoUrls> {
     this.clearLoginInfo();
     return this.http.get<SsoUrls>(`${this.authApiUrl}/Logout`).pipe(
       tap(urls => {
-        const currentUrl = window.location.href.split('#')[0]; // Clean hash if any
-        // In the ref, they use a utility to remove params, let's keep it simple for now or implement the util
-        const returnUrl = this.removeURLParameter(currentUrl, 'CertificateKey');
-        window.location.href = `${urls.logoutPage}?url=${encodeURIComponent(returnUrl)}`;
+        const returnUrl = this.removeURLParameter(window.location.href, 'CertificateKey');
+        const logoutPage = this.resolveAbsoluteRedirectUrl(urls.logoutPage);
+        window.location.href = `${logoutPage}?url=${encodeURIComponent(returnUrl)}`;
       })
     );
   }
 
-  // Adapted from reference
   tryAuth(returnUrl: string, autoRedirectSso: boolean): Observable<EmpInfo | null> {
     const refreshToken = localStorage.getItem(REFRESH_KEY);
-    // Note: The reference implementation sends refreshToken in body. 
-    // It also seems to assume that if we have a refresh token we try to use it.
-    // If not, we might fail immediately or return null.
     
     return this.http.post<EmpInfo>(`${this.authApiUrl}/RefreshToken`, { refreshToken })
       .pipe(
@@ -112,43 +143,47 @@ export class AuthService {
           console.log(`tryAuth error:`, e);
           return of(null);
         }),
-        // Logic from ref: if null and autoRedirect, get SSO url and redirect
         tap(user => {
           if (!user && autoRedirectSso) {
-             this.getSsoUrls().pipe(delay(100)) // slight delay
-             .subscribe(urls => {
-                const cleanReturnUrl = this.removeURLParameter(returnUrl, 'CertificateKey');
-                window.location.href = `${urls.loginPage}?url=${encodeURIComponent(cleanReturnUrl)}`;
-             });
+            // slight delay then redirect
+            this.getSsoUrls().pipe(delay(100)).subscribe(() => {
+              this.redirectToSso(returnUrl);
+            });
           }
         })
       );
   }
 
-  // Utility from reference
   removeURLParameter(url: string, parameter: string): string {
-    const urlparts = url.split('?');
-    if (urlparts.length >= 2) {
-      const prefix = encodeURIComponent(parameter) + '=';
-      const pars = urlparts[1].split(/[&;]/g);
-      for (let i = pars.length; i-- > 0;) {
-          if (pars[i].lastIndexOf(prefix, 0) !== -1) {
-              pars.splice(i, 1);
-          }
+    try {
+      const urlObj = new URL(url, window.location.origin);
+      urlObj.searchParams.delete(parameter);
+      
+      // Also check hash part if using HashLocationStrategy (e.g., /#/?CertificateKey=...)
+      if (urlObj.hash.includes('?')) {
+        const [hashPath, hashQuery] = urlObj.hash.split('?');
+        const hashParams = new URLSearchParams(hashQuery);
+        hashParams.delete(parameter);
+        const newHashQuery = hashParams.toString();
+        urlObj.hash = newHashQuery ? `${hashPath}?${newHashQuery}` : hashPath;
       }
-      return urlparts[0] + (pars.length > 0 ? '?' + pars.join('&') : '');
+      return urlObj.toString();
+    } catch {
+      // Fallback string replacement
+      const regex = new RegExp(`[?&]${parameter}=[^&#]*(#.*)?$`);
+      return url.replace(regex, '$1');
     }
-    return url;
   }
 
   redirectToSso(returnUrl: string) {
     this.getSsoUrls().subscribe(urls => {
       const cleanReturnUrl = this.removeURLParameter(returnUrl, 'CertificateKey');
-      window.location.href = `${urls.loginPage}?url=${encodeURIComponent(cleanReturnUrl)}`;
+      const loginPage = this.resolveAbsoluteRedirectUrl(urls.loginPage);
+      window.location.href = `${loginPage}?url=${encodeURIComponent(cleanReturnUrl)}`;
     });
   }
 
-  checkAuthorize(shop: string, id: string, functionId: string, subSystem?: string): Observable<any> {
+  checkAuthorize(shop: string, id: string, functionId: string, subSystem?: string): Observable<unknown> {
     return this.http.get(
       `${this.authApiUrl}/CheckAuthorize/${id}/${functionId}?subSystem=${subSystem ?? ''}`,
       { observe: 'response' }
@@ -156,9 +191,6 @@ export class AuthService {
   }
 
   uacAuth(shop: string, id: string, password: string): Observable<EmpInfo> {
-    // The reference uses a different URL for UAC auth usually, 
-    // but let's assume it's part of the same base for now or adjust if we find more info.
-    // Ref: this.configProvider.uacApiUrl(shop)
     return this.http.post<EmpInfo>(`${this.authApiUrl}/UacAuth`, { id, password })
       .pipe(tap(user => {
         if (user) {

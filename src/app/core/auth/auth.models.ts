@@ -2,6 +2,7 @@ export interface EmpInfo {
   no: string;
   id: string;
   name: string;
+  email?: string;
   department: string;
   orgShop: string;
   location: string;
@@ -17,12 +18,10 @@ export interface SsoUrls {
 }
 
 export interface UserInfo {
-  // Add properties as needed based on future requirements, 
-  // keeping it generic for now as per reference usage
   userId?: string;
   apName?: string;
   functionName?: string;
   shop?: string;
   no?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }

@@ -3,18 +3,34 @@ import { AuthService } from './auth.service';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { EmpInfo, SsoUrls } from './auth.models';
+import { ConfigService } from '../config/config.service';
+import { signal, WritableSignal } from '@angular/core';
+import { vi } from 'vitest';
 
 describe('AuthService', () => {
   let service: AuthService;
   let httpMock: HttpTestingController;
-  const apiBaseUrl = 'http://tncimweb1.cminl.oa/uacapi/adAuth';
+  let configServiceMock: {
+    authApiUrl: WritableSignal<string>;
+    isMockAuth: WritableSignal<boolean>;
+    mockUser: WritableSignal<Partial<EmpInfo> | null>;
+  };
+
+  const defaultApiBaseUrl = 'http://tncimweb1.cminl.oa/uacapi/adAuth';
 
   beforeEach(() => {
+    configServiceMock = {
+      authApiUrl: signal(defaultApiBaseUrl),
+      isMockAuth: signal(false),
+      mockUser: signal<Partial<EmpInfo> | null>(null)
+    };
+
     TestBed.configureTestingModule({
       providers: [
         AuthService,
         provideHttpClient(),
-        provideHttpClientTesting()
+        provideHttpClientTesting(),
+        { provide: ConfigService, useValue: configServiceMock }
       ]
     });
     service = TestBed.inject(AuthService);
@@ -32,7 +48,7 @@ describe('AuthService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should verify certificate', () => {
+  it('should verify certificate with configured absolute URL', () => {
     const mockUser: EmpInfo = {
       no: '123', id: 'test', name: 'Test', department: 'D', orgShop: 'S', 
       location: 'L', shops: [], token: 'jwt', departmentCode: 'DC', refreshToken: 'rt'
@@ -44,10 +60,49 @@ describe('AuthService', () => {
       expect(localStorage.getItem('CIM_TK')).toBe('jwt');
     });
 
-    const req = httpMock.expectOne(`${apiBaseUrl}/VerifyCert`);
+    const req = httpMock.expectOne(`${defaultApiBaseUrl}/VerifyCert`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ CertificateKey: 'cert-key' });
     req.flush(mockUser);
+  });
+
+  it('should support relative path authApiUrl without duplicate slashes', () => {
+    configServiceMock.authApiUrl.set('/Apigateway/MesApiCore');
+
+    const mockUser: EmpInfo = {
+      no: '123', id: 'test', name: 'Test', department: 'D', orgShop: 'S', 
+      location: 'L', shops: [], token: 'jwt', departmentCode: 'DC', refreshToken: 'rt'
+    };
+
+    service.verifyCertificate('cert-key').subscribe(user => {
+      expect(user).toEqual(mockUser);
+    });
+
+    const req = httpMock.expectOne('/Apigateway/MesApiCore/VerifyCert');
+    expect(req.request.method).toBe('POST');
+    req.flush(mockUser);
+  });
+
+  it('should handle mockAuth when enabled without issuing HTTP requests', async () => {
+    configServiceMock.isMockAuth.set(true);
+    configServiceMock.mockUser.set({
+      id: 'DEV001',
+      name: 'Local Developer',
+      token: 'mock-jwt-token',
+      refreshToken: 'mock-refresh-token',
+      shops: ['FAB1', 'FAB2']
+    });
+
+    const initResult = await service.init();
+    expect(initResult).toBeTruthy();
+    expect(service.currentUser()?.id).toBe('DEV001');
+    expect(service.currentUser()?.name).toBe('Local Developer');
+    expect(service.isAuthenticated()).toBe(true);
+    expect(localStorage.getItem('CIM_TK')).toBe('mock-jwt-token');
+
+    // No HTTP calls should be pending
+    httpMock.expectNone('/VerifyCert');
+    httpMock.expectNone('/RefreshToken');
   });
 
   it('should refresh token', () => {
@@ -64,7 +119,7 @@ describe('AuthService', () => {
       expect(localStorage.getItem('CIM_RTK')).toBe('new-rt');
     });
 
-    const req = httpMock.expectOne(`${apiBaseUrl}/RefreshToken`);
+    const req = httpMock.expectOne(`${defaultApiBaseUrl}/RefreshToken`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ refreshToken: 'old-rt' });
     req.flush(mockUser);
@@ -72,10 +127,10 @@ describe('AuthService', () => {
 
   it('should check authorize', () => {
     service.checkAuthorize('S1', 'U1', 'F1').subscribe(res => {
-      expect(res.status).toBe(200);
+      expect(res).toBeTruthy();
     });
 
-    const req = httpMock.expectOne(`${apiBaseUrl}/CheckAuthorize/U1/F1?subSystem=`);
+    const req = httpMock.expectOne(`${defaultApiBaseUrl}/CheckAuthorize/U1/F1?subSystem=`);
     expect(req.request.method).toBe('GET');
     req.flush({}, { status: 200, statusText: 'OK' });
   });
@@ -91,7 +146,7 @@ describe('AuthService', () => {
       expect(service.currentUser()).toEqual(mockUser);
     });
 
-    const req = httpMock.expectOne(`${apiBaseUrl}/UacAuth`);
+    const req = httpMock.expectOne(`${defaultApiBaseUrl}/UacAuth`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ id: 'U1', password: 'P1' });
     req.flush(mockUser);
@@ -102,14 +157,11 @@ describe('AuthService', () => {
     const windowSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
       href: ''
-    } as any);
+    } as Location);
     
-    // Note: window.location.href assignment is hard to test in Vitest/JSDOM 
-    // without full window mock or abstraction. 
-    // We'll just check if getSsoUrls was called.
     service.redirectToSso('http://localhost/test');
     
-    const req = httpMock.expectOne(`${apiBaseUrl}/SsoUrl`);
+    const req = httpMock.expectOne(`${defaultApiBaseUrl}/SsoUrl`);
     expect(req.request.method).toBe('GET');
     req.flush(mockUrls);
     

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Angular 專案範本腳手架生成腳本 (angular-template-2026)
 
@@ -144,6 +144,20 @@ Replace-FileString (Join-Path $WorkDir "README.md") @{
 
 Replace-FileString (Join-Path $WorkDir "conductor\product.md") @{
     "template-app" = $KebabName
+}
+
+Replace-FileString (Join-Path $WorkDir "GLOSSARY.md") @{
+    "# Angular Enterprise Template" = ("# " + $PascalName)
+}
+
+Replace-FileString (Join-Path $WorkDir "src\assets\config.json") @{
+    '"appTitle": "template-app"' = ('"appTitle": "' + $KebabName + '"')
+}
+
+$tracksDir = Join-Path $WorkDir "conductor\tracks"
+if (Test-Path $tracksDir) {
+    Remove-Item -Recurse -Force $tracksDir
+    Write-Host "           [清理] 已重置 conductor\tracks 目錄" -ForegroundColor Gray
 }
 
 if (-not $InPlace) {

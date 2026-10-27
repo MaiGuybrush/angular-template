@@ -8,7 +8,10 @@ describe('authGuard', () => {
   const executeGuard: CanActivateFn = (...guardParameters) => 
       TestBed.runInInjectionContext(() => authGuard(...guardParameters));
 
-  let authServiceMock: any;
+  let authServiceMock: {
+    isAuthenticated: ReturnType<typeof vi.fn>;
+    redirectToSso: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     authServiceMock = {

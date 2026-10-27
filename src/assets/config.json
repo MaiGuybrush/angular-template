@@ -1,0 +1,13 @@
+{
+  "appTitle": "template-app",
+  "authApiUrl": "/uacapi/adAuth",
+  "mockAuth": false,
+  "mockUser": {
+    "id": "DEV001",
+    "name": "Local Developer",
+    "email": "dev@innolux.com",
+    "token": "mock-dev-token",
+    "refreshToken": "mock-dev-refresh-token",
+    "shops": ["FAB1", "FAB2"]
+  }
+}

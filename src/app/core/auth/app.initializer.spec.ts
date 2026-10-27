@@ -1,66 +1,107 @@
-import { TestBed } from '@angular/core/testing';
 import { appInitializer } from './app.initializer';
-import { AuthService } from './auth.service';
 import { of } from 'rxjs';
 import { vi } from 'vitest';
+import { AuthService } from './auth.service';
+import { ConfigService } from '../config/config.service';
+import { EmpInfo } from './auth.models';
 
 describe('appInitializer', () => {
-  let authService: any;
+  let authService: {
+    init: ReturnType<typeof vi.fn>;
+    verifyCertificate: ReturnType<typeof vi.fn>;
+    tryAuth: ReturnType<typeof vi.fn>;
+    removeURLParameter: ReturnType<typeof vi.fn>;
+  };
+  let configService: {
+    loadConfig: ReturnType<typeof vi.fn>;
+  };
+
+  const dummyUser: EmpInfo = {
+    no: '1',
+    id: 'test',
+    name: 'Test',
+    department: 'D',
+    orgShop: 'S',
+    location: 'L',
+    shops: [],
+    token: 'jwt',
+    departmentCode: 'DC',
+    refreshToken: 'rt'
+  };
 
   beforeEach(() => {
+    configService = {
+      loadConfig: vi.fn().mockResolvedValue({
+        appTitle: 'template-app',
+        authApiUrl: '/uacapi/adAuth',
+        mockAuth: false
+      })
+    };
+
     authService = {
+      init: vi.fn().mockResolvedValue(null),
       verifyCertificate: vi.fn(),
       tryAuth: vi.fn(),
-      removeURLParameter: vi.fn().mockImplementation((url) => url)
+      removeURLParameter: vi.fn().mockImplementation((url: string) => url)
     };
   });
 
-  it('should call verifyCertificate if CertificateKey is present', async () => {
-    // Mock window location
-    const originalLocation = window.location;
-    const originalHistory = window.history;
-    
-    delete (window as any).location;
-    (window as any).location = { 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should bypass remote auth if mockAuth is enabled and handled by authService.init()', async () => {
+    authService.init.mockResolvedValue({ id: 'DEV001', name: 'Mock Dev' } as EmpInfo);
+
+    const initFn = appInitializer(configService as unknown as ConfigService, authService as unknown as AuthService);
+    await initFn();
+
+    expect(configService.loadConfig).toHaveBeenCalled();
+    expect(authService.init).toHaveBeenCalled();
+    expect(authService.verifyCertificate).not.toHaveBeenCalled();
+    expect(authService.tryAuth).not.toHaveBeenCalled();
+  });
+
+  it('should call verifyCertificate if mockAuth is disabled and CertificateKey is present', async () => {
+    const mockLocation = { 
       href: 'http://localhost?CertificateKey=123',
       search: '?CertificateKey=123' 
-    };
-    
-    // Mock history
-    const replaceStateSpy = vi.fn();
-    delete (window as any).history;
-    (window as any).history = { replaceState: replaceStateSpy };
+    } as Location;
 
-    authService.verifyCertificate.mockReturnValue(of({id: 'test'}));
+    vi.spyOn(window, 'location', 'get').mockReturnValue(mockLocation);
     
-    const initFn = appInitializer(authService);
+    const replaceStateSpy = vi.fn();
+    vi.spyOn(window, 'history', 'get').mockReturnValue({
+      ...window.history,
+      replaceState: replaceStateSpy
+    });
+
+    authService.verifyCertificate.mockReturnValue(of(dummyUser));
+    
+    const initFn = appInitializer(configService as unknown as ConfigService, authService as unknown as AuthService);
     await initFn();
 
+    expect(configService.loadConfig).toHaveBeenCalled();
+    expect(authService.init).toHaveBeenCalled();
     expect(authService.verifyCertificate).toHaveBeenCalledWith('123');
     expect(replaceStateSpy).toHaveBeenCalled();
-    
-    // cleanup
-    window.location = originalLocation as any;
-    window.history = originalHistory as any;
   });
 
-  it('should call tryAuth if CertificateKey is missing', async () => {
-    // Mock window location
-    const originalLocation = window.location;
-    delete (window as any).location;
-    (window as any).location = { 
+  it('should call tryAuth if mockAuth is disabled and CertificateKey is missing', async () => {
+    const mockLocation = { 
       href: 'http://localhost/app',
       search: '' 
-    };
+    } as Location;
 
-    authService.tryAuth.mockReturnValue(of({}));
+    vi.spyOn(window, 'location', 'get').mockReturnValue(mockLocation);
 
-    const initFn = appInitializer(authService);
+    authService.tryAuth.mockReturnValue(of(dummyUser));
+
+    const initFn = appInitializer(configService as unknown as ConfigService, authService as unknown as AuthService);
     await initFn();
 
+    expect(configService.loadConfig).toHaveBeenCalled();
+    expect(authService.init).toHaveBeenCalled();
     expect(authService.tryAuth).toHaveBeenCalledWith('http://localhost/app', true);
-    
-    // cleanup
-    window.location = originalLocation as any;
   });
 });
