@@ -9,7 +9,11 @@ import { signal, WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EmpInfo, SsoUrls } from '../../core/auth/auth.models';
-import { VERSION_INFO, VersionInfo, DEFAULT_READ_VERSION_SAVE_KEY } from '../../core/version/version.models';
+import {
+  VERSION_INFO,
+  VersionInfo,
+  DEFAULT_READ_VERSION_SAVE_KEY,
+} from '../../core/version/version.models';
 
 describe('AppShellComponent', () => {
   let component: AppShellComponent;
@@ -29,7 +33,7 @@ describe('AppShellComponent', () => {
 
     versionInfoValue = {
       versions: ['1.0.0'],
-      readCompleteSaveKey: ''
+      readCompleteSaveKey: '',
     };
 
     authServiceMock = {
@@ -43,13 +47,13 @@ describe('AppShellComponent', () => {
         refreshToken: 'rtk',
         department: 'CIM',
         departmentCode: 'CIM01',
-        location: 'Tainan'
+        location: 'Tainan',
       }),
-      logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls))
+      logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls)),
     };
 
     configServiceMock = {
-      appTitle: signal('MES Production Monitor')
+      appTitle: signal('MES Production Monitor'),
     };
 
     await TestBed.configureTestingModule({
@@ -60,8 +64,8 @@ describe('AppShellComponent', () => {
         provideHttpClientTesting(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
-        { provide: VERSION_INFO, useValue: versionInfoValue }
-      ]
+        { provide: VERSION_INFO, useValue: versionInfoValue },
+      ],
     }).compileComponents();
 
     httpTesting = TestBed.inject(HttpTestingController);
@@ -112,7 +116,7 @@ describe('AppShellComponent', () => {
     req.forEach((r) => r.flush('# 1.0.0'));
 
     fixture.componentRef.setInput('navItems', [
-      { label: '自訂報表 / Reports', route: '/reports', icon: 'report' }
+      { label: '自訂報表 / Reports', route: '/reports', icon: 'report' },
     ]);
     fixture.detectChanges();
 
@@ -141,6 +145,115 @@ describe('AppShellComponent', () => {
 
     component.logout();
     expect(authServiceMock.logOutObs).toHaveBeenCalled();
+  });
+
+  describe('Header Three-Dots Dropdown Menu & On-Demand Version History', () => {
+    it('should render three-dots menu button next to user profile and not render standalone logout button', () => {
+      fixture.detectChanges();
+      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
+      req.forEach((r) => r.flush('# 1.0.0'));
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.logout-btn')).toBeNull();
+
+      const menuTrigger = compiled.querySelector('.menu-trigger-btn');
+      expect(menuTrigger).toBeTruthy();
+      expect(menuTrigger?.getAttribute('aria-label')).toBe('選單');
+    });
+
+    it('should toggle dropdown menu on clicking the three-dots button', () => {
+      fixture.detectChanges();
+      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
+      req.forEach((r) => r.flush('# 1.0.0'));
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
+      expect(compiled.querySelector('.dropdown-menu')).toBeNull();
+
+      menuTrigger.click();
+      fixture.detectChanges();
+
+      const dropdown = compiled.querySelector('.dropdown-menu');
+      expect(dropdown).toBeTruthy();
+      expect(dropdown?.textContent).toContain('版本資訊');
+      expect(dropdown?.textContent).toContain('登出');
+
+      menuTrigger.click();
+      fixture.detectChanges();
+      expect(compiled.querySelector('.dropdown-menu')).toBeNull();
+    });
+
+    it('should close dropdown menu when clicking outside', () => {
+      fixture.detectChanges();
+      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
+      req.forEach((r) => r.flush('# 1.0.0'));
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
+      menuTrigger.click();
+      fixture.detectChanges();
+      expect(compiled.querySelector('.dropdown-menu')).toBeTruthy();
+
+      document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      fixture.detectChanges();
+      expect(compiled.querySelector('.dropdown-menu')).toBeNull();
+    });
+
+    it('should open historical version timeline dialog with showAll = true when "版本資訊" is selected', () => {
+      versionInfoValue.versions = ['1.2.0', '1.1.0', '1.0.0'];
+      localStorage.setItem('1-MES Production Monitor-readVersionInfo', '1.2.0');
+
+      fixture.detectChanges();
+      httpTesting.expectNone('./assets/versions/1.2.0/version-1.2.0.md');
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.version-modal-dialog')).toBeNull();
+
+      const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
+      menuTrigger.click();
+      fixture.detectChanges();
+
+      const menuItems = Array.from(compiled.querySelectorAll('.menu-item')) as HTMLButtonElement[];
+      const versionItem = menuItems.find((el) => el.textContent?.includes('版本資訊'));
+      expect(versionItem).toBeTruthy();
+
+      versionItem?.click();
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('.dropdown-menu')).toBeNull();
+
+      const req1 = httpTesting.expectOne('./assets/versions/1.2.0/version-1.2.0.md');
+      const req2 = httpTesting.expectOne('./assets/versions/1.1.0/version-1.1.0.md');
+      const req3 = httpTesting.expectOne('./assets/versions/1.0.0/version-1.0.0.md');
+      req1.flush('## 1.2.0 Features');
+      req2.flush('## 1.1.0 Enhancements');
+      req3.flush('## 1.0.0 Initial');
+      fixture.detectChanges();
+
+      expect(compiled.querySelector('.version-modal-dialog')).toBeTruthy();
+      const cards = compiled.querySelectorAll('.timeline-card');
+      expect(cards.length).toBe(3);
+    });
+
+    it('should invoke authService.logOutObs and close dropdown when "登出" is selected', () => {
+      fixture.detectChanges();
+      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
+      req.forEach((r) => r.flush('# 1.0.0'));
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
+      menuTrigger.click();
+      fixture.detectChanges();
+
+      const menuItems = Array.from(compiled.querySelectorAll('.menu-item')) as HTMLButtonElement[];
+      const logoutItem = menuItems.find((el) => el.textContent?.includes('登出'));
+      expect(logoutItem).toBeTruthy();
+
+      logoutItem?.click();
+      fixture.detectChanges();
+
+      expect(authServiceMock.logOutObs).toHaveBeenCalled();
+      expect(compiled.querySelector('.dropdown-menu')).toBeNull();
+    });
   });
 
   describe('Version Auto-Detection & Timeline Dialog Integration', () => {
@@ -229,7 +342,7 @@ describe('AppShellComponent', () => {
         refreshToken: 'rtk2',
         department: 'CIM',
         departmentCode: 'CIM02',
-        location: 'Tainan'
+        location: 'Tainan',
       });
 
       fixture.detectChanges();
@@ -254,7 +367,7 @@ describe('AppShellComponent', () => {
         refreshToken: 'rtk',
         department: '',
         departmentCode: '',
-        location: ''
+        location: '',
       });
       configServiceMock.appTitle.set('');
 

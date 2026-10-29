@@ -1,4 +1,4 @@
-import { Component, inject, signal, input, effect } from '@angular/core';
+import { Component, inject, signal, input, effect, ElementRef, HostListener } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ConfigService } from '../../core/config/config.service';
@@ -10,8 +10,8 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
   {
     label: '儀表板 / Dashboard',
     route: '/dashboard',
-    icon: 'dashboard'
-  }
+    icon: 'dashboard',
+  },
 ];
 
 @Component({
@@ -19,17 +19,19 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, VersionDialogComponent],
   templateUrl: './app-shell.component.html',
-  styleUrl: './app-shell.component.css'
+  styleUrl: './app-shell.component.css',
 })
 export class AppShellComponent {
   private readonly authService = inject(AuthService);
   private readonly configService = inject(ConfigService);
   private readonly versionInfoService = inject(VersionInfoService);
+  private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly currentUser = this.authService.currentUser;
   readonly appTitle = this.configService.appTitle;
 
   readonly isSidebarCollapsed = signal<boolean>(false);
+  readonly isUserMenuOpen = signal<boolean>(false);
 
   readonly navItems = input<NavItem[]>(DEFAULT_NAV_ITEMS);
 
@@ -49,7 +51,35 @@ export class AppShellComponent {
     this.isSidebarCollapsed.update((val) => !val);
   }
 
+  toggleUserMenu(): void {
+    this.isUserMenuOpen.update((val) => !val);
+  }
+
+  closeUserMenu(): void {
+    this.isUserMenuOpen.set(false);
+  }
+
+  openVersionInfo(): void {
+    this.closeUserMenu();
+    this.versionInfoService.showVersionInfoDialog(true);
+  }
+
   logout(): void {
+    this.closeUserMenu();
     this.authService.logOutObs().subscribe();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const container = this.elementRef.nativeElement.querySelector('.user-menu-container');
+    const target = event.target;
+    if (
+      this.isUserMenuOpen() &&
+      container &&
+      target instanceof Node &&
+      !container.contains(target)
+    ) {
+      this.closeUserMenu();
+    }
   }
 }
