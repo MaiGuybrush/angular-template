@@ -50,7 +50,7 @@
 
         @if (isUserMenuOpen()) {
           <div class="dropdown-menu">
-            <button class="menu-item" (click)="openVersionInfo()">
+            <button class="dropdown-action" (click)="openVersionInfo()">
               <svg
                 width="16"
                 height="16"
@@ -67,7 +67,7 @@
               </svg>
               <span>版本資訊</span>
             </button>
-            <button class="menu-item menu-item-danger" (click)="logout()">
+            <button class="dropdown-action dropdown-action-danger" (click)="logout()">
               <svg
                 width="16"
                 height="16"

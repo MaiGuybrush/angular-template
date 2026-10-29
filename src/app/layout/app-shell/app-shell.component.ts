@@ -71,14 +71,13 @@ export class AppShellComponent {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
+    if (!this.isUserMenuOpen()) {
+      return;
+    }
+
     const container = this.elementRef.nativeElement.querySelector('.user-menu-container');
     const target = event.target;
-    if (
-      this.isUserMenuOpen() &&
-      container &&
-      target instanceof Node &&
-      !container.contains(target)
-    ) {
+    if (container && target instanceof Node && !container.contains(target)) {
       this.closeUserMenu();
     }
   }

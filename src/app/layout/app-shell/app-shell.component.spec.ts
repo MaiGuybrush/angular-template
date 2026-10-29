@@ -73,6 +73,11 @@ describe('AppShellComponent', () => {
     component = fixture.componentInstance;
   });
 
+  const flushDefaultVersionReq = (): void => {
+    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
+    req.forEach((r) => r.flush('# 1.0.0'));
+  };
+
   afterEach(() => {
     httpTesting.verify();
     localStorage.clear();
@@ -80,8 +85,7 @@ describe('AppShellComponent', () => {
 
   it('should render application title in header', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('.app-title')?.textContent).toContain('MES Production Monitor');
@@ -89,8 +93,7 @@ describe('AppShellComponent', () => {
 
   it('should render employee info and shop context in header', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     const compiled = fixture.nativeElement as HTMLElement;
     const userSummary = compiled.querySelector('.user-profile')?.textContent;
@@ -101,8 +104,7 @@ describe('AppShellComponent', () => {
 
   it('should render navigation items in sidebar', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     const compiled = fixture.nativeElement as HTMLElement;
     const navLinks = compiled.querySelectorAll('.sidebar-nav-item');
@@ -112,8 +114,7 @@ describe('AppShellComponent', () => {
 
   it('should support custom navItems input', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     fixture.componentRef.setInput('navItems', [
       { label: '自訂報表 / Reports', route: '/reports', icon: 'report' },
@@ -126,8 +127,7 @@ describe('AppShellComponent', () => {
 
   it('should toggle sidebar collapsed state', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     expect(component.isSidebarCollapsed()).toBe(false);
     component.toggleSidebar();
@@ -140,8 +140,7 @@ describe('AppShellComponent', () => {
 
   it('should invoke authService.logOutObs when logout is clicked', () => {
     fixture.detectChanges();
-    const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-    req.forEach((r) => r.flush('# 1.0.0'));
+    flushDefaultVersionReq();
 
     component.logout();
     expect(authServiceMock.logOutObs).toHaveBeenCalled();
@@ -150,8 +149,7 @@ describe('AppShellComponent', () => {
   describe('Header Three-Dots Dropdown Menu & On-Demand Version History', () => {
     it('should render three-dots menu button next to user profile and not render standalone logout button', () => {
       fixture.detectChanges();
-      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-      req.forEach((r) => r.flush('# 1.0.0'));
+      flushDefaultVersionReq();
 
       const compiled = fixture.nativeElement as HTMLElement;
       expect(compiled.querySelector('.logout-btn')).toBeNull();
@@ -163,8 +161,7 @@ describe('AppShellComponent', () => {
 
     it('should toggle dropdown menu on clicking the three-dots button', () => {
       fixture.detectChanges();
-      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-      req.forEach((r) => r.flush('# 1.0.0'));
+      flushDefaultVersionReq();
 
       const compiled = fixture.nativeElement as HTMLElement;
       const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
@@ -185,8 +182,7 @@ describe('AppShellComponent', () => {
 
     it('should close dropdown menu when clicking outside', () => {
       fixture.detectChanges();
-      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-      req.forEach((r) => r.flush('# 1.0.0'));
+      flushDefaultVersionReq();
 
       const compiled = fixture.nativeElement as HTMLElement;
       const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
@@ -212,11 +208,13 @@ describe('AppShellComponent', () => {
       menuTrigger.click();
       fixture.detectChanges();
 
-      const menuItems = Array.from(compiled.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-      const versionItem = menuItems.find((el) => el.textContent?.includes('版本資訊'));
-      expect(versionItem).toBeTruthy();
+      const actions = Array.from(
+        compiled.querySelectorAll('.dropdown-action'),
+      ) as HTMLButtonElement[];
+      const versionAction = actions.find((el) => el.textContent?.includes('版本資訊'));
+      expect(versionAction).toBeTruthy();
 
-      versionItem?.click();
+      versionAction?.click();
       fixture.detectChanges();
 
       expect(compiled.querySelector('.dropdown-menu')).toBeNull();
@@ -236,19 +234,20 @@ describe('AppShellComponent', () => {
 
     it('should invoke authService.logOutObs and close dropdown when "登出" is selected', () => {
       fixture.detectChanges();
-      const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
-      req.forEach((r) => r.flush('# 1.0.0'));
+      flushDefaultVersionReq();
 
       const compiled = fixture.nativeElement as HTMLElement;
       const menuTrigger = compiled.querySelector('.menu-trigger-btn') as HTMLButtonElement;
       menuTrigger.click();
       fixture.detectChanges();
 
-      const menuItems = Array.from(compiled.querySelectorAll('.menu-item')) as HTMLButtonElement[];
-      const logoutItem = menuItems.find((el) => el.textContent?.includes('登出'));
-      expect(logoutItem).toBeTruthy();
+      const actions = Array.from(
+        compiled.querySelectorAll('.dropdown-action'),
+      ) as HTMLButtonElement[];
+      const logoutAction = actions.find((el) => el.textContent?.includes('登出'));
+      expect(logoutAction).toBeTruthy();
 
-      logoutItem?.click();
+      logoutAction?.click();
       fixture.detectChanges();
 
       expect(authServiceMock.logOutObs).toHaveBeenCalled();
