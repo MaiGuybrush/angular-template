@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { VersionInfoService } from './version-info.service';
-import { VERSION_INFO, VersionInfo } from './version.models';
+import { VERSION_INFO, VersionInfo, DEFAULT_READ_VERSION_SAVE_KEY } from './version.models';
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 
 describe('VersionInfoService', () => {
@@ -15,7 +15,7 @@ describe('VersionInfoService', () => {
 
     mockVersionInfo = {
       versions: ['1.0.0'],
-      readCompleteSaveKey: 'test-app-readVersionInfo',
+      readCompleteSaveKey: 'test-app-readVersionInfo'
     };
 
     TestBed.configureTestingModule({
@@ -23,8 +23,8 @@ describe('VersionInfoService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         VersionInfoService,
-        { provide: VERSION_INFO, useValue: mockVersionInfo },
-      ],
+        { provide: VERSION_INFO, useValue: mockVersionInfo }
+      ]
     });
 
     service = TestBed.inject(VersionInfoService);
@@ -102,7 +102,7 @@ describe('VersionInfoService', () => {
     httpTesting.expectOne('./assets/versions/1.0.0/version-1.0.0.md').flush('v1.0.0');
   });
 
-  it('should save latest version to localStorage and close dialog on acknowledgeVersionInfo()', () => {
+  it('should save latest version to localStorage under configured key on acknowledgeVersionInfo()', () => {
     mockVersionInfo.versions = ['1.2.0', '1.1.0', '1.0.0'];
     service.showVersionInfoDialog(true);
     expect(service.isOpen()).toBe(true);
@@ -111,10 +111,30 @@ describe('VersionInfoService', () => {
 
     expect(service.isOpen()).toBe(false);
     expect(localStorage.getItem('test-app-readVersionInfo')).toBe('1.2.0');
-    expect(localStorage.getItem('--readVersionInfo')).toBe('1.2.0');
 
     // Clean up pending requests
     httpTesting.match(() => true).forEach((req) => req.flush(''));
+  });
+
+  it('should fallback to DEFAULT_READ_VERSION_SAVE_KEY when readCompleteSaveKey is empty', () => {
+    mockVersionInfo.readCompleteSaveKey = '';
+    mockVersionInfo.versions = ['1.0.0'];
+
+    service.showVersionInfoDialog(false);
+    expect(service.isOpen()).toBe(true);
+
+    service.acknowledgeVersionInfo();
+    expect(localStorage.getItem(DEFAULT_READ_VERSION_SAVE_KEY)).toBe('1.0.0');
+
+    httpTesting.match(() => true).forEach((req) => req.flush(''));
+  });
+
+  it('should dynamically update storage key on setUserContext() to support shared workstation employee isolation', () => {
+    service.setUserContext('USER_A', 'myApp');
+    expect(mockVersionInfo.readCompleteSaveKey).toBe('USER_A-myApp-readVersionInfo');
+
+    service.setUserContext('USER_B', 'myApp');
+    expect(mockVersionInfo.readCompleteSaveKey).toBe('USER_B-myApp-readVersionInfo');
   });
 
   it('should close dialog without saving on closeDialog()', () => {

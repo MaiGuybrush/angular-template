@@ -9,7 +9,7 @@ import { signal, WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EmpInfo, SsoUrls } from '../../core/auth/auth.models';
-import { VERSION_INFO, VersionInfo } from '../../core/version/version.models';
+import { VERSION_INFO, VersionInfo, DEFAULT_READ_VERSION_SAVE_KEY } from '../../core/version/version.models';
 
 describe('AppShellComponent', () => {
   let component: AppShellComponent;
@@ -29,7 +29,7 @@ describe('AppShellComponent', () => {
 
     versionInfoValue = {
       versions: ['1.0.0'],
-      readCompleteSaveKey: '',
+      readCompleteSaveKey: ''
     };
 
     authServiceMock = {
@@ -43,13 +43,13 @@ describe('AppShellComponent', () => {
         refreshToken: 'rtk',
         department: 'CIM',
         departmentCode: 'CIM01',
-        location: 'Tainan',
+        location: 'Tainan'
       }),
-      logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls)),
+      logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls))
     };
 
     configServiceMock = {
-      appTitle: signal('MES Production Monitor'),
+      appTitle: signal('MES Production Monitor')
     };
 
     await TestBed.configureTestingModule({
@@ -60,8 +60,8 @@ describe('AppShellComponent', () => {
         provideHttpClientTesting(),
         { provide: AuthService, useValue: authServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
-        { provide: VERSION_INFO, useValue: versionInfoValue },
-      ],
+        { provide: VERSION_INFO, useValue: versionInfoValue }
+      ]
     }).compileComponents();
 
     httpTesting = TestBed.inject(HttpTestingController);
@@ -76,7 +76,6 @@ describe('AppShellComponent', () => {
 
   it('should render application title in header', () => {
     fixture.detectChanges();
-    // Flush any automatic version request triggered by effect on login
     const req = httpTesting.match('./assets/versions/1.0.0/version-1.0.0.md');
     req.forEach((r) => r.flush('# 1.0.0'));
 
@@ -113,7 +112,7 @@ describe('AppShellComponent', () => {
     req.forEach((r) => r.flush('# 1.0.0'));
 
     fixture.componentRef.setInput('navItems', [
-      { label: '自訂報表 / Reports', route: '/reports', icon: 'report' },
+      { label: '自訂報表 / Reports', route: '/reports', icon: 'report' }
     ]);
     fixture.detectChanges();
 
@@ -180,9 +179,7 @@ describe('AppShellComponent', () => {
       fixture.detectChanges();
 
       expect(compiled.querySelector('.version-modal-dialog')).toBeNull();
-      // Verifies scoped persistence and fallback compatibility
       expect(localStorage.getItem('1-MES Production Monitor-readVersionInfo')).toBe('1.0.0');
-      expect(localStorage.getItem('--readVersionInfo')).toBe('1.0.0');
     });
 
     it('should not open version dialog if current version is already acknowledged in localStorage', () => {
@@ -215,6 +212,64 @@ describe('AppShellComponent', () => {
       expect(compiled.textContent).toContain('1.2.0 Features');
       expect(compiled.textContent).toContain('1.1.0 Bug Fixes');
       expect(compiled.textContent).not.toContain('version-1.0.0');
+    });
+
+    it('should support shared workstation employee isolation when different employees log in', () => {
+      // User 1 acknowledges 1.0.0
+      localStorage.setItem('1-MES Production Monitor-readVersionInfo', '1.0.0');
+
+      // User 2 logs in on the same machine
+      authServiceMock.currentUser.set({
+        no: '2',
+        id: 'T67890',
+        name: '李小華',
+        orgShop: 'FAB2',
+        shops: ['FAB2'],
+        token: 'tk2',
+        refreshToken: 'rtk2',
+        department: 'CIM',
+        departmentCode: 'CIM02',
+        location: 'Tainan'
+      });
+
+      fixture.detectChanges();
+
+      // User 2 should get the update notification because their key has no acknowledgment
+      const req = httpTesting.expectOne('./assets/versions/1.0.0/version-1.0.0.md');
+      req.flush('# 1.0.0');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.version-modal-dialog')).toBeTruthy();
+    });
+
+    it('should fallback to DEFAULT_READ_VERSION_SAVE_KEY when user identifier and appTitle are empty', () => {
+      authServiceMock.currentUser.set({
+        no: '',
+        id: '',
+        name: 'Guest',
+        orgShop: '',
+        shops: [],
+        token: 'tk',
+        refreshToken: 'rtk',
+        department: '',
+        departmentCode: '',
+        location: ''
+      });
+      configServiceMock.appTitle.set('');
+
+      fixture.detectChanges();
+
+      const req = httpTesting.expectOne('./assets/versions/1.0.0/version-1.0.0.md');
+      req.flush('# 1.0.0');
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const confirmBtn = compiled.querySelector('.btn-confirm') as HTMLButtonElement;
+      confirmBtn.click();
+      fixture.detectChanges();
+
+      expect(localStorage.getItem(DEFAULT_READ_VERSION_SAVE_KEY)).toBe('1.0.0');
     });
   });
 });

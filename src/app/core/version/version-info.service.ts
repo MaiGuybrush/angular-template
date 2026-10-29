@@ -2,11 +2,13 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { VERSION_INFO, VersionInfo } from './version.models';
+import { VERSION_INFO, VersionInfo, DEFAULT_READ_VERSION_SAVE_KEY } from './version.models';
 import { compareSemver } from './semver.util';
 
 function sanitizeMarkdownHtml(html: string): string {
   if (typeof window !== 'undefined') {
+    // Justification: In standard browser execution DOMPurify exports the sanitize method directly;
+    // in Node/JSDOM testing environments, DOMPurify may be loaded as a factory function requiring the window instance.
     const purify =
       typeof DOMPurify.sanitize === 'function'
         ? DOMPurify
@@ -17,29 +19,25 @@ function sanitizeMarkdownHtml(html: string): string {
 }
 
 @Injectable({
-  providedIn: 'root',
+  providedIn: 'root'
 })
 export class VersionInfoService {
-  private http = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   readonly versionInfo = inject<VersionInfo>(VERSION_INFO);
 
   readonly isOpen = signal<boolean>(false);
   readonly displayVersions = signal<string[]>([]);
   readonly unreadVersions = signal<string[]>([]);
   readonly versionContents = signal<Record<string, string>>({});
-  readonly isLoading = signal<boolean>(false);
 
-  private getEffectiveSaveKey(): string {
-    return this.versionInfo.readCompleteSaveKey || '--readVersionInfo';
+  setUserContext(empId: string, appTitle: string): void {
+    this.versionInfo.readCompleteSaveKey =
+      empId || appTitle ? `${empId}-${appTitle}-readVersionInfo` : DEFAULT_READ_VERSION_SAVE_KEY;
   }
 
   private getLastReadVersion(): string | null {
-    const primaryKey = this.versionInfo.readCompleteSaveKey;
-    if (primaryKey) {
-      const val = localStorage.getItem(primaryKey);
-      if (val) return val;
-    }
-    return localStorage.getItem('--readVersionInfo');
+    const key = this.versionInfo.readCompleteSaveKey || DEFAULT_READ_VERSION_SAVE_KEY;
+    return localStorage.getItem(key);
   }
 
   showVersionInfoDialog(showAll = false): void {
@@ -73,17 +71,18 @@ export class VersionInfoService {
       this.http.get(url, { responseType: 'text' }).subscribe({
         next: (rawMarkdown) => {
           try {
+            // Justification: marked.parse returns string synchronously when no async extensions are registered.
             const rawHtml = marked.parse(rawMarkdown) as string;
             const cleanHtml = sanitizeMarkdownHtml(rawHtml);
             this.versionContents.update((prev) => ({
               ...prev,
-              [version]: cleanHtml,
+              [version]: cleanHtml
             }));
           } catch (e) {
             console.error(`Failed to parse release notes for version ${version}`, e);
             this.versionContents.update((prev) => ({
               ...prev,
-              [version]: '<p>無法解析版本說明</p>',
+              [version]: '<p>無法解析版本說明</p>'
             }));
           }
         },
@@ -91,9 +90,9 @@ export class VersionInfoService {
           console.warn(`Failed to fetch release note at ${url}`, err);
           this.versionContents.update((prev) => ({
             ...prev,
-            [version]: '<p>暫無版本說明</p>',
+            [version]: '<p>暫無版本說明</p>'
           }));
-        },
+        }
       });
     }
   }
@@ -101,13 +100,8 @@ export class VersionInfoService {
   acknowledgeVersionInfo(): void {
     const latestVersion = this.versionInfo.versions?.[0];
     if (latestVersion) {
-      const primaryKey = this.versionInfo.readCompleteSaveKey;
-      if (primaryKey) {
-        localStorage.setItem(primaryKey, latestVersion);
-      }
-      if (primaryKey !== '--readVersionInfo') {
-        localStorage.setItem('--readVersionInfo', latestVersion);
-      }
+      const key = this.versionInfo.readCompleteSaveKey || DEFAULT_READ_VERSION_SAVE_KEY;
+      localStorage.setItem(key, latestVersion);
     }
     this.isOpen.set(false);
   }
