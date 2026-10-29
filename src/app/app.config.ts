@@ -1,4 +1,9 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideAppInitializer, inject } from '@angular/core';
+import {
+  ApplicationConfig,
+  provideBrowserGlobalErrorListeners,
+  provideAppInitializer,
+  inject,
+} from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
 import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@angular/common/http';
 
@@ -7,6 +12,7 @@ import { ConfigService } from './core/config/config.service';
 import { AuthService } from './core/auth/auth.service';
 import { appInitializer } from './core/auth/app.initializer';
 import { JwtInterceptor } from './core/auth/jwt.interceptor';
+import { VERSION_INFO } from './core/version/version.models';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -21,7 +27,14 @@ export const appConfig: ApplicationConfig = {
     {
       provide: HTTP_INTERCEPTORS,
       useClass: JwtInterceptor,
-      multi: true
-    }
-  ]
+      multi: true,
+    },
+    {
+      provide: VERSION_INFO,
+      useValue: {
+        versions: ['1.0.0'],
+        readCompleteSaveKey: '',
+      },
+    },
+  ],
 };
