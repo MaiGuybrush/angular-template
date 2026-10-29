@@ -4,9 +4,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { AppShellComponent } from './app-shell.component';
 import { AuthService } from '../../core/auth/auth.service';
 import { ConfigService } from '../../core/config/config.service';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router, NavigationEnd } from '@angular/router';
 import { signal, WritableSignal } from '@angular/core';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EmpInfo, SsoUrls } from '../../core/auth/auth.models';
 import {
@@ -14,6 +14,7 @@ import {
   VersionInfo,
   DEFAULT_READ_VERSION_SAVE_KEY,
 } from '../../core/version/version.models';
+import { ModuleInfoConfig, RuntimeConfig } from '../../core/config/config.models';
 
 describe('AppShellComponent', () => {
   let component: AppShellComponent;
@@ -25,6 +26,8 @@ describe('AppShellComponent', () => {
   };
   let configServiceMock: {
     appTitle: WritableSignal<string>;
+    config: WritableSignal<RuntimeConfig>;
+    modulesInfo: WritableSignal<ModuleInfoConfig[] | undefined>;
   };
   let versionInfoValue: VersionInfo;
 
@@ -52,8 +55,24 @@ describe('AppShellComponent', () => {
       logOutObs: vi.fn().mockReturnValue(of({} as SsoUrls)),
     };
 
+    const initialModules: ModuleInfoConfig[] = [
+      {
+        moduleName: 'Dashboard',
+        version: '1.0.0',
+        owner: 'Local Developer',
+        extNo: '12345',
+        routePattern: '^/dashboard',
+      },
+    ];
+
     configServiceMock = {
       appTitle: signal('MES Production Monitor'),
+      config: signal<RuntimeConfig>({
+        appTitle: 'MES Production Monitor',
+        authApiUrl: '/uacapi',
+        modulesInfo: initialModules,
+      }),
+      modulesInfo: signal<ModuleInfoConfig[] | undefined>(initialModules),
     };
 
     await TestBed.configureTestingModule({
@@ -327,10 +346,8 @@ describe('AppShellComponent', () => {
     });
 
     it('should support shared workstation employee isolation when different employees log in', () => {
-      // User 1 acknowledges 1.0.0
       localStorage.setItem('1-MES Production Monitor-readVersionInfo', '1.0.0');
 
-      // User 2 logs in on the same machine
       authServiceMock.currentUser.set({
         no: '2',
         id: 'T67890',
@@ -346,7 +363,6 @@ describe('AppShellComponent', () => {
 
       fixture.detectChanges();
 
-      // User 2 should get the update notification because their key has no acknowledgment
       const req = httpTesting.expectOne('./assets/versions/1.0.0/version-1.0.0.md');
       req.flush('# 1.0.0');
       fixture.detectChanges();
@@ -382,6 +398,77 @@ describe('AppShellComponent', () => {
       fixture.detectChanges();
 
       expect(localStorage.getItem(DEFAULT_READ_VERSION_SAVE_KEY)).toBe('1.0.0');
+    });
+  });
+
+  describe('Enterprise Three-Column Footer Integration', () => {
+    it('should render three-column footer at the bottom of AppShell with version, copyright, and owner details', () => {
+      fixture.detectChanges();
+      flushDefaultVersionReq();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      const footer = compiled.querySelector('app-footer');
+      expect(footer).toBeTruthy();
+
+      const front = compiled.querySelector('.bottom-front')?.textContent?.trim();
+      const center = compiled.querySelector('.bottom-center')?.textContent?.trim();
+      const end = compiled.querySelector('.bottom-end')?.textContent?.trim();
+
+      expect(front).toBe('1.0.0');
+      expect(center).toBe('© 2026 Innolux Inc. All rights reserved.');
+      expect(end).toBe('Owner: Local Developer(Ext: 12345)');
+
+      const headerTitle = compiled.querySelector('.header-left .app-title')?.textContent?.trim();
+      expect(headerTitle).toBe('MES Production Monitor');
+      expect(compiled.querySelector('.header-left .version-badge')).toBeNull();
+    });
+
+    it('should dynamically update footer module owner on route navigation in AppShell', () => {
+      const router = TestBed.inject(Router);
+      fixture.detectChanges();
+      flushDefaultVersionReq();
+
+      const newModules = [
+        {
+          moduleName: 'Dashboard',
+          version: '1.0.0',
+          owner: 'Local Developer',
+          extNo: '12345',
+          routePattern: '^/dashboard',
+        },
+        {
+          moduleName: 'Settings',
+          version: '1.0.0',
+          owner: '陳專員',
+          extNo: '99999',
+          routePattern: '^/settings',
+        },
+      ];
+      configServiceMock.modulesInfo.set(newModules);
+      configServiceMock.config.update((c) => ({ ...c, modulesInfo: newModules }));
+
+      vi.spyOn(router, 'url', 'get').mockReturnValue('/settings');
+      (router.events as Subject<unknown>).next(new NavigationEnd(10, '/settings', '/settings'));
+      fixture.detectChanges();
+
+      const compiled = fixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.bottom-end')?.textContent?.trim()).toBe(
+        'Owner: 陳專員(Ext: 99999)',
+      );
+    });
+
+    it('should resolve active module owner on initial load when route matches pattern', () => {
+      const router = TestBed.inject(Router);
+      vi.spyOn(router, 'url', 'get').mockReturnValue('/dashboard');
+
+      const initFixture = TestBed.createComponent(AppShellComponent);
+      initFixture.detectChanges();
+      flushDefaultVersionReq();
+
+      const compiled = initFixture.nativeElement as HTMLElement;
+      expect(compiled.querySelector('.bottom-end')?.textContent?.trim()).toBe(
+        'Owner: Local Developer(Ext: 12345)',
+      );
     });
   });
 });

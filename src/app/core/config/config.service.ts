@@ -6,21 +6,22 @@ import { RuntimeConfig } from './config.models';
 const DEFAULT_CONFIG: RuntimeConfig = {
   appTitle: 'template-app',
   authApiUrl: '/uacapi/adAuth',
-  mockAuth: false
+  mockAuth: false,
 };
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ConfigService {
-  private http = inject(HttpClient);
-  private _config = signal<RuntimeConfig>(DEFAULT_CONFIG);
+  private readonly http = inject(HttpClient);
+  private readonly _config = signal<RuntimeConfig>(DEFAULT_CONFIG);
 
   readonly config = computed(() => this._config());
   readonly appTitle = computed(() => this._config().appTitle);
   readonly authApiUrl = computed(() => this._config().authApiUrl);
   readonly isMockAuth = computed(() => !!this._config().mockAuth);
   readonly mockUser = computed(() => this._config().mockUser);
+  readonly modulesInfo = computed(() => this._config().modulesInfo);
 
   normalizeUrl(url: string): string {
     if (!url) return '';
@@ -33,13 +34,13 @@ export class ConfigService {
         catchError((err) => {
           console.warn('Failed to load assets/config.json, falling back to defaults:', err);
           return of(DEFAULT_CONFIG);
-        })
-      )
+        }),
+      ),
     );
 
     const normalizedConfig: RuntimeConfig = {
       ...config,
-      authApiUrl: this.normalizeUrl(config.authApiUrl)
+      authApiUrl: this.normalizeUrl(config.authApiUrl),
     };
 
     this._config.set(normalizedConfig);

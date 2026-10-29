@@ -5,6 +5,7 @@ import { ConfigService } from '../../core/config/config.service';
 import { NavItem } from '../nav.models';
 import { VersionInfoService } from '../../core/version/version-info.service';
 import { VersionDialogComponent } from '../version-dialog/version-dialog.component';
+import { FooterComponent } from '../footer/footer.component';
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
   {
@@ -17,7 +18,7 @@ const DEFAULT_NAV_ITEMS: NavItem[] = [
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, VersionDialogComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, VersionDialogComponent, FooterComponent],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.css',
 })

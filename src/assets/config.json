@@ -9,5 +9,14 @@
     "token": "mock-dev-token",
     "refreshToken": "mock-dev-refresh-token",
     "shops": ["FAB1", "FAB2"]
-  }
+  },
+  "modulesInfo": [
+    {
+      "moduleName": "Dashboard",
+      "version": "1.0.0",
+      "owner": "Local Developer",
+      "extNo": "12345",
+      "routePattern": "^/dashboard"
+    }
+  ]
 }
