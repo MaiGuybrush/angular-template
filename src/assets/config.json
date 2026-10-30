@@ -1,7 +1,7 @@
 {
   "appTitle": "template-app",
   "authApiUrl": "/uacapi/adAuth",
-  "mockAuth": false,
+  "mockAuth": true,
   "mockUser": {
     "id": "DEV001",
     "name": "Local Developer",
